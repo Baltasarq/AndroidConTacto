@@ -1,15 +1,19 @@
 package com.devbaltasarq.tacto;
 
-import android.content.ContentValues;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.database.Cursor;
-import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.ContextMenu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.CursorAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
@@ -19,11 +23,12 @@ import android.widget.Toast;
 public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        super.onCreate( savedInstanceState );
+        this.setContentView( R.layout.activity_main );
 
         final ListView lvContacts = this.findViewById( R.id.lvContacts );
         final ImageButton btAdd = this.findViewById( R.id.btAdd );
+        final ImageButton btSearch = this.findViewById( R.id.btSearch );
 
         btAdd.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -31,9 +36,22 @@ public class MainActivity extends AppCompatActivity {
                 MainActivity.this.addContact();
             }
         });
+        btSearch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                MainActivity.this.searchContacts();
+            }
+        });
 
-        this.dbManager = new SqlIO( this.getApplicationContext() );
         this.registerForContextMenu( lvContacts );
+    }
+
+    @Override
+    protected void onResume()
+    {
+        super.onResume();
+
+        this.dbManager = new DBManager( this.getApplicationContext() );
         this.showContacts();
     }
 
@@ -41,7 +59,44 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause()
     {
         super.onPause();
+
+        this.mainCursorAdapter.getCursor().close();
         this.dbManager.close();
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo)
+    {
+        super.onCreateContextMenu(menu, v, menuInfo);
+
+        if ( v.getId() == R.id.lvContacts ) {
+            this.getMenuInflater().inflate( R.menu.lvcontacts_context_menu, menu );
+        }
+
+        return;
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        boolean toret = false;
+
+        int pos = ( (AdapterView.AdapterContextMenuInfo) item.getMenuInfo() ).position;
+        switch ( item.getItemId() ) {
+            case R.id.lvcontacts_menu_item_delete:
+                this.deleteContact( pos );
+                toret = true;
+                break;
+            case R.id.lvcontacts_menu_item_modify:
+                this.modifyContact( pos );
+                toret = true;
+                break;
+            case R.id.lvcontacts_menu_item_call:
+                this.callContact( pos );
+                toret = true;
+                break;
+        }
+
+        return toret;
     }
 
     private void showContacts()
@@ -49,16 +104,18 @@ public class MainActivity extends AppCompatActivity {
         final ListView lvContacts = this.findViewById( R.id.lvContacts );
         SQLiteDatabase db = this.dbManager.getReadableDatabase();
 
-        Cursor allContacts = db.query( SqlIO.TABLE_CONTACTS,
-                null, null, null, null, null, null );
-
-        SimpleCursorAdapter cursorAdapter = new SimpleCursorAdapter( this,
+        this.mainCursorAdapter = new SimpleCursorAdapter( this,
                 R.layout.lvcontacts,
-                allContacts,
-                new String[]{ SqlIO.CONTACTS_COL_NAME, SqlIO.CONTACTS_COL_TLF },
+                this.dbManager.getAllContacts(),
+                new String[]{ DBManager.CONTACTS_COL_NAME, DBManager.CONTACTS_COL_TLF },
                 new int[] { R.id.lvContacts_Name, R.id.lvContacts_Tlf } );
 
-        lvContacts.setAdapter( cursorAdapter );
+        lvContacts.setAdapter( this.mainCursorAdapter);
+    }
+
+    private void updateContacts()
+    {
+        this.mainCursorAdapter.changeCursor( this.dbManager.getAllContacts() );
     }
 
     private void addContact()
@@ -69,83 +126,135 @@ public class MainActivity extends AppCompatActivity {
         if ( !name.isEmpty() ) {
             final EditText edTlf = new EditText( this );
             AlertDialog.Builder dlg = new AlertDialog.Builder( this );
-            dlg.setTitle( "Tlf?" );
+            dlg.setTitle( this.getString( R.string.lblPhone ) + "?" );
             dlg.setView( edTlf );
-            dlg.setNegativeButton( "Cancel", null );
-            dlg.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            dlg.setNegativeButton( this.getString( R.string.lblCancel ), null );
+            dlg.setPositiveButton( this.getString( R.string.lblOk ), new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialogInterface, int i) {
-                    MainActivity.this.dbAdd( name, edTlf.getText().toString() );
+                    MainActivity.this.dbManager.add( name, edTlf.getText().toString() );
                     edName.setText( "" );
-                    MainActivity.this.showContacts();
+                    MainActivity.this.updateContacts();
                 }
             });
             dlg.create().show();
         } else {
-            Toast.makeText( this, "Name??", Toast.LENGTH_LONG ).show();
+            Toast.makeText( this, this.getString( R.string.lblName ) + "??",
+                    Toast.LENGTH_LONG ).show();
         }
 
         return;
     }
 
-    private void dbAdd(String name, String tlf)
+    private void searchContacts()
     {
-        SQLiteDatabase db = this.dbManager.getWritableDatabase();
-        Cursor cursor = null;
+        final EditText edName = this.findViewById( R.id.edName );
+        final String text = edName.getText().toString();
 
-        try {
-            db.beginTransaction();
-            cursor = db.query( SqlIO.TABLE_CONTACTS,
-                    new String[]{ SqlIO.CONTACTS_COL_NAME },
-                    SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name },
-                    null, null, null,
-                    "1" );
+        if ( !text.isEmpty() ) {
+            Cursor cursor = this.dbManager.searchFor( text );
 
-            if ( cursor.getCount() > 0 ) {
-                ContentValues values = new ContentValues();
-                values.put( "_id", name );
-                values.put( "tlf", tlf );
-
-                db.update( SqlIO.TABLE_CONTACTS, values,
-                            SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name }  );
-            } else {
-                ContentValues values = new ContentValues();
-                values.put( "_id", name );
-                values.put( "tlf", tlf );
-
-                db.insert( SqlIO.TABLE_CONTACTS, null, values );
-            }
-
-            db.setTransactionSuccessful();
-        } catch(SQLException exc) {
-            Log.e( "dbAdd", exc.getMessage() );
-            Toast.makeText( this, "Database ERROR: could not add: " + name, Toast.LENGTH_LONG ).show();
-        }
-        finally {
             if ( cursor != null ) {
-                cursor.close();
+                if ( cursor.moveToFirst() ) {
+                    String rows = "";
+
+                    do {
+                        rows += cursor.getString( 0 ) + ": " + cursor.getString( 1 ) + "\n";
+                    } while( cursor.moveToNext() );
+
+                    AlertDialog.Builder dlg = new AlertDialog.Builder( this );
+                    dlg.setMessage( rows );
+                    dlg.create().show();
+                    edName.setText( "" );
+                } else {
+                    Toast.makeText( this, this.getString( R.string.msgNoContacts ),
+                                    Toast.LENGTH_LONG ).show();
+                }
+            } else {
+                Toast.makeText( this, "Internal BD Error", Toast.LENGTH_LONG ).show();
             }
-
-            db.endTransaction();
+        } else {
+            Toast.makeText( this, this.getString( R.string.lblName ) + "??",
+                            Toast.LENGTH_LONG ).show();
         }
+
+        return;
     }
 
-    private void dbRemove(String name)
+    private void deleteContact(int pos)
     {
-        SQLiteDatabase db = this.dbManager.getWritableDatabase();
+        Cursor cursor = this.mainCursorAdapter.getCursor();
 
-        try {
-            db.beginTransaction();
-            db.delete( SqlIO.TABLE_CONTACTS, SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name } );
-            db.setTransactionSuccessful();
-        } catch(SQLException exc) {
-            Log.e( "dbRemove", exc.getMessage() );
-            Toast.makeText( this, "Database ERROR: could not remove: " + name, Toast.LENGTH_LONG ).show();
+        if ( cursor.moveToPosition( pos ) ) {
+            this.dbManager.remove( cursor.getString( 0 ) );
+            this.updateContacts();
+        } else {
+            String errMsg = this.getString( R.string.msgInvalidPosition ) + ": " + pos;
+
+            Log.e( "main.deleteContact", errMsg );
+            Toast.makeText( this, errMsg, Toast.LENGTH_LONG ).show();
         }
-        finally {
-            db.endTransaction();
-        }
+
+        return;
     }
 
-    private SqlIO dbManager;
+    private void modifyContact(int pos)
+    {
+        Cursor cursor = this.mainCursorAdapter.getCursor();
+
+        if ( cursor.moveToPosition( pos ) ) {
+            final EditText edTlf = new EditText( this );
+            final String tlf = cursor.getString( 1 );
+            final String name = cursor.getString( 0 );
+            AlertDialog.Builder dlg = new AlertDialog.Builder( this );
+
+            dlg.setTitle( this.getString( R.string.lblPhone ) + "?" );
+            edTlf.setText( tlf );
+            dlg.setView( edTlf );
+            dlg.setNegativeButton( this.getString( R.string.lblCancel ), null );
+            dlg.setPositiveButton( this.getString( R.string.lblOk ), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    MainActivity.this.dbManager.add( name, edTlf.getText().toString() );
+                    MainActivity.this.updateContacts();
+                }
+            });
+            dlg.create().show();
+        } else {
+            String errMsg = this.getString( R.string.msgInvalidPosition ) + ": " + pos;
+
+            Log.e( "main.modifyContact", errMsg );
+            Toast.makeText( this, errMsg, Toast.LENGTH_LONG ).show();
+        }
+
+        return;
+    }
+
+    private void callContact(int pos)
+    {
+        Cursor cursor = this.mainCursorAdapter.getCursor();
+
+        if ( cursor.moveToPosition( pos ) ) {
+            final String tlf = cursor.getString( 1 );
+            Intent intent = new Intent( Intent.ACTION_CALL, Uri.parse( "tel:" + tlf ) );
+
+            try {
+                this.startActivity( intent );
+            } catch(SecurityException exc) {
+                Toast.makeText( this,
+                        this.getString( R.string.msgNoCall ),
+                        Toast.LENGTH_LONG ).show();
+            }
+        } else {
+            String errMsg = this.getString( R.string.msgInvalidPosition ) + ": " + pos;
+
+            Log.e( "main.deleteContact", errMsg );
+            Toast.makeText( this, errMsg, Toast.LENGTH_LONG ).show();
+        }
+
+        return;
+    }
+
+    private DBManager dbManager;
+    private CursorAdapter mainCursorAdapter;
 }

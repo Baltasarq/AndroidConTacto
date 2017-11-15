@@ -38,7 +38,7 @@ public class SqlIO extends SQLiteOpenHelper {
 
         try {
             db.beginTransaction();
-            db.execSQL("DROP TABLE IF EXISTS " + DB_TABLE_CONTACTS);
+            db.execSQL( "DROP TABLE IF EXISTS " + DB_TABLE_CONTACTS );
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();

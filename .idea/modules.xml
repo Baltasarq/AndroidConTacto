@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$USER_HOME$/Dropbox/Prys/Android/Tacto/Tacto.iml" filepath="$USER_HOME$/Dropbox/Prys/Android/Tacto/Tacto.iml" />
-      <module fileurl="file://$USER_HOME$/Dropbox/Prys/Android/Tacto/app/app.iml" filepath="$USER_HOME$/Dropbox/Prys/Android/Tacto/app/app.iml" />
+      <module fileurl="file://$USER_HOME$/Dropbox/Prys/Android/AndroidConTacto/AndroidConTacto.iml" filepath="$USER_HOME$/Dropbox/Prys/Android/AndroidConTacto/AndroidConTacto.iml" />
+      <module fileurl="file://$USER_HOME$/Dropbox/Prys/Android/AndroidConTacto/app/app.iml" filepath="$USER_HOME$/Dropbox/Prys/Android/AndroidConTacto/app/app.iml" />
     </modules>
   </component>
 </project>

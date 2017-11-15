@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         final ListView lvContacts = this.findViewById( R.id.lvContacts );
         SQLiteDatabase db = this.dbManager.getReadableDatabase();
 
-        Cursor allContacts = db.rawQuery( "SELECT * FROM contacts", null );
+        Cursor allContacts = db.rawQuery( "SELECT * FROM contacts", null );//?", new String[]{ SqlIO.DB_TABLE_CONTACTS } );
 
         SimpleCursorAdapter cursorAdapter = new SimpleCursorAdapter( this,
                 R.layout.lvcontacts,

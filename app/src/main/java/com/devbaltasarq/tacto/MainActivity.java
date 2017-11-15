@@ -49,12 +49,13 @@ public class MainActivity extends AppCompatActivity {
         final ListView lvContacts = this.findViewById( R.id.lvContacts );
         SQLiteDatabase db = this.dbManager.getReadableDatabase();
 
-        Cursor allContacts = db.rawQuery( "SELECT * FROM contacts", null );//?", new String[]{ SqlIO.DB_TABLE_CONTACTS } );
+        Cursor allContacts = db.query( SqlIO.TABLE_CONTACTS,
+                null, null, null, null, null, null );
 
         SimpleCursorAdapter cursorAdapter = new SimpleCursorAdapter( this,
                 R.layout.lvcontacts,
                 allContacts,
-                new String[]{ "_id", "tlf" },
+                new String[]{ SqlIO.CONTACTS_COL_NAME, SqlIO.CONTACTS_COL_TLF },
                 new int[] { R.id.lvContacts_Name, R.id.lvContacts_Tlf } );
 
         lvContacts.setAdapter( cursorAdapter );
@@ -75,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onClick(DialogInterface dialogInterface, int i) {
                     MainActivity.this.dbAdd( name, edTlf.getText().toString() );
+                    edName.setText( "" );
                     MainActivity.this.showContacts();
                 }
             });
@@ -93,12 +95,10 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             db.beginTransaction();
-            cursor = db.query( SqlIO.DB_TABLE_CONTACTS,
-                    new String[]{ "_id" },
-                    "_id=?", new String[]{ name },
-                    null,
-                    null,
-                    null,
+            cursor = db.query( SqlIO.TABLE_CONTACTS,
+                    new String[]{ SqlIO.CONTACTS_COL_NAME },
+                    SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name },
+                    null, null, null,
                     "1" );
 
             if ( cursor.getCount() > 0 ) {
@@ -106,13 +106,14 @@ public class MainActivity extends AppCompatActivity {
                 values.put( "_id", name );
                 values.put( "tlf", tlf );
 
-                db.update( SqlIO.DB_TABLE_CONTACTS, values, "_id = ?", new String[]{ name }  );
+                db.update( SqlIO.TABLE_CONTACTS, values,
+                            SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name }  );
             } else {
                 ContentValues values = new ContentValues();
                 values.put( "_id", name );
                 values.put( "tlf", tlf );
 
-                db.insert( SqlIO.DB_TABLE_CONTACTS, null, values );
+                db.insert( SqlIO.TABLE_CONTACTS, null, values );
             }
 
             db.setTransactionSuccessful();
@@ -135,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             db.beginTransaction();
-            db.delete( SqlIO.DB_TABLE_CONTACTS, "_id = ?", new String[]{ name } );
+            db.delete( SqlIO.TABLE_CONTACTS, SqlIO.CONTACTS_COL_NAME + " = ?", new String[]{ name } );
             db.setTransactionSuccessful();
         } catch(SQLException exc) {
             Log.e( "dbRemove", exc.getMessage() );

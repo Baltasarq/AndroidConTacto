@@ -44,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         this.registerForContextMenu( lvContacts );
+        this.dbManager = new DBManager( this.getApplicationContext() );
     }
 
     @Override
@@ -51,8 +52,16 @@ public class MainActivity extends AppCompatActivity {
     {
         super.onResume();
 
-        this.dbManager = new DBManager( this.getApplicationContext() );
-        this.showContacts();
+        final ListView lvContacts = this.findViewById( R.id.lvContacts );
+
+        this.mainCursorAdapter = new SimpleCursorAdapter( this,
+                R.layout.lvcontacts,
+                null,
+                new String[]{ DBManager.CONTACTS_COL_NAME, DBManager.CONTACTS_COL_TLF },
+                new int[] { R.id.lvContacts_Name, R.id.lvContacts_Tlf } );
+
+        lvContacts.setAdapter( this.mainCursorAdapter );
+        this.updateContacts();
     }
 
     @Override
@@ -97,20 +106,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return toret;
-    }
-
-    private void showContacts()
-    {
-        final ListView lvContacts = this.findViewById( R.id.lvContacts );
-        SQLiteDatabase db = this.dbManager.getReadableDatabase();
-
-        this.mainCursorAdapter = new SimpleCursorAdapter( this,
-                R.layout.lvcontacts,
-                this.dbManager.getAllContacts(),
-                new String[]{ DBManager.CONTACTS_COL_NAME, DBManager.CONTACTS_COL_TLF },
-                new int[] { R.id.lvContacts_Name, R.id.lvContacts_Tlf } );
-
-        lvContacts.setAdapter( this.mainCursorAdapter);
     }
 
     private void updateContacts()
